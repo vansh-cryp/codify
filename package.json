@@ -9,25 +9,52 @@
   "categories": [
     "Other"
   ],
-  "activationEvents": [],
   "main": "./extension.js",
   "contributes": {
-    "commands": [{
-      "command": "codify.helloWorld",
-      "title": "Hello World"
-    }]
-  },
+    "commands": [
+      {
+        "command": "spotify.playPause",
+        "title": "Play/Pause"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "spotify",
+          "title": "Spotify",
+          "icon": "./spotify.svg"
+        }
+      ]
+    },
+    "views": {
+      "spotify": [
+        {
+          "icon": "./spotify.svg",
+          "type": "webview",
+          "id": "spotifyView",
+          "name": "Spotify Player",
+          "when": "true"
+        }
+      ]
+    }
+  },"activationEvents": [
+    "onView:spotifyView"
+  ],
   "scripts": {
     "lint": "eslint .",
     "pretest": "npm run lint",
     "test": "vscode-test"
   },
   "devDependencies": {
-    "@types/vscode": "^1.108.1",
     "@types/mocha": "^10.0.10",
     "@types/node": "22.x",
-    "eslint": "^9.39.2",
+    "@types/vscode": "^1.108.1",
     "@vscode/test-cli": "^0.0.12",
-    "@vscode/test-electron": "^2.5.2"
+    "@vscode/test-electron": "^2.5.2",
+    "eslint": "^9.39.2"
+  },
+  "dependencies": {
+    "@vscode/webview-ui-toolkit": "^1.4.0",
+    "spotify-web-api-node": "^5.0.2"
   }
 }
