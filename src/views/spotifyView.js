@@ -1,8 +1,9 @@
 const vscode = require('vscode');
 
 class SpotifyViewProvider {
-	constructor(context) {
+	constructor(context, apiService) {
 		this.context = context;
+		this.apiService = apiService;
 		this._view = undefined;
 	}
 
@@ -23,24 +24,72 @@ class SpotifyViewProvider {
 
 		webviewView.webview.html = this._getHtmlForWebview(webviewView.webview);
 
+		// Start playback polling
+		if (this.apiService) {
+			this.apiService.startPlaybackPolling(webviewView, 1000);
+		}
+
 		// Handle messages from the webview
-		webviewView.webview.onDidReceiveMessage(data => {
-			switch (data.command) {
-				case 'play':
-					vscode.window.showInformationMessage('Play clicked');
-					break;
-				case 'pause':
-					vscode.window.showInformationMessage('Pause clicked');
-					break;
-				case 'next':
-					vscode.window.showInformationMessage('Next clicked');
-					break;
-				case 'previous':
-					vscode.window.showInformationMessage('Previous clicked');
-					break;
-				case 'search':
-					vscode.window.showInformationMessage(`Search for: ${data.query}`);
-					break;
+		webviewView.webview.onDidReceiveMessage(async data => {
+			console.log('Received message from webview:', data.command);
+			try {
+				switch (data.command) {
+					case 'play':
+						console.log('Play command triggered');
+						try {
+							await this.apiService.play();
+						} catch (error) {
+							if (error.message.includes('Restriction violated')) {
+								throw new Error('Play/Pause requires Spotify Premium. Try next/previous or search features instead.');
+							}
+							throw error;
+						}
+						break;
+					case 'pause':
+						console.log('Pause command triggered');
+						try {
+							await this.apiService.pause();
+						} catch (error) {
+							if (error.message.includes('Restriction violated')) {
+								throw new Error('Play/Pause requires Spotify Premium. Try next/previous or search features instead.');
+							}
+							throw error;
+						}
+						break;
+					case 'next':
+						console.log('Next command triggered');
+						await this.apiService.next();
+						break;
+					case 'previous':
+						console.log('Previous command triggered');
+						await this.apiService.previous();
+						break;
+
+					case 'seek':
+						console.log('Seek command triggered:', data.percent);
+						if (data.percent !== undefined) {
+							// Get current playback state to find duration
+							const playbackState = await this.apiService.getPlaybackState();
+							if (playbackState && playbackState.item) {
+								const positionMs = (data.percent / 100) * playbackState.item.duration_ms;
+								await this.apiService.seek(positionMs);
+							}
+						}
+						break;
+				}
+			} catch (error) {
+				console.error(`Command ${data.command} failed:`, error);
+				webviewView.webview.postMessage({
+					command: 'error',
+					message: `${data.command} failed: ${error.message}`,
+				});
+			}
+		});
+
+		// Clean up polling when view is disposed
+		webviewView.onDidDispose(() => {
+			if (this.apiService) {
+				this.apiService.stopPlaybackPolling();
 			}
 		});
 	}
@@ -108,22 +157,13 @@ class SpotifyViewProvider {
 						</button>
 					</div>
 
-					<div class="search-section">
-						<input 
-							type="text" 
-							class="search-input" 
-							id="searchInput" 
-							placeholder="Search tracks..."
-						>
-						<button class="search-btn" id="searchBtn">🔍</button>
-					</div>
-
-					<div class="playlist-section">
-						<h2>Search Results</h2>
-						<div class="track-list" id="trackList">
-							<p class="empty-state">Search for tracks to play</p>
+					<div class="lyrics-section">
+						<h2>Lyrics</h2>
+					<div class="lyrics-container" id="lyricsContainer">
+						<div class="lyrics-text">
+							<div class="lyrics-line">Play a song to see lyrics</div>
 						</div>
-					</div>
+
 				</div>
 
 				<script nonce="${nonce}" src="${scriptUri}"></script>
